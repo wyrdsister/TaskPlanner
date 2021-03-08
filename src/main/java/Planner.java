@@ -8,12 +8,11 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 public class Planner {
-    private TIntObjectMap<TIntList> taskMap;
+    private final TIntObjectMap<TIntList> taskMap;
 
     public Planner() {
         this.taskMap = new TIntObjectHashMap<>();
@@ -65,11 +64,13 @@ public class Planner {
     }
 
     private void readFileAndFillTaskMap(String filename) throws IOException {
-        try (FileInputStream stream = new FileInputStream(filename);
-             Scanner scanner = new Scanner(stream)) {
-            while (scanner.hasNext()) {
-                int value1 = scanner.nextInt();
-                int value2 = scanner.nextInt();
+        try (FileReader reader = new FileReader(filename);
+             BufferedReader br = new BufferedReader(reader)) {
+            br.lines().forEach(line -> {
+                var separator = line.indexOf(' ');
+
+                int value1 = Integer.parseInt(line.substring(0, separator));
+                int value2 = Integer.parseInt(line.substring(separator + 1));
 
                 if (!taskMap.containsKey(value1)) {
                     TIntList linkedList = new TIntArrayList();
@@ -78,7 +79,7 @@ public class Planner {
                 } else {
                     taskMap.get(value1).add(value2);
                 }
-            }
+            });
         }
     }
 }
