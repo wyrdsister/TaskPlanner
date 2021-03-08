@@ -1,80 +1,84 @@
-import org.apache.commons.collections4.MultiValuedMap;
-import org.apache.commons.collections4.multimap.HashSetValuedHashMap;
+import gnu.trove.TIntCollection;
+import gnu.trove.iterator.TIntIterator;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.linked.TIntLinkedList;
+import gnu.trove.map.TIntObjectMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
+import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.*;
 
 public class Planner {
-    private MultiValuedMap<Integer, Integer> taskMap;
+    private TIntObjectMap<TIntList> taskMap;
 
-    public Planner() {}
+    public Planner() {
+        this.taskMap = new TIntObjectHashMap<>();
+    }
 
-    public List<List<Integer>> planTasks(String filename) throws Exception {
+    public List<TIntSet> planTasks(String filename) throws Exception {
         readFileAndFillTaskMap(filename);
 
-        Set<Integer> keys = taskMap.keySet();
-        Set<Integer> values = new LinkedHashSet<>(taskMap.values());
-
-        List<Integer> noIncomingNodes = new LinkedList<>();
-        for (Integer key : keys) {
-            if (values.add(key))
-                noIncomingNodes.add(key);
+        TIntSet noIncomingNodes = new TIntHashSet(taskMap.keySet());
+        for (TIntList linkedNodes : taskMap.valueCollection()) {
+            noIncomingNodes.removeAll(linkedNodes);
         }
 
         return sortTaskMap(noIncomingNodes);
     }
 
-    private List<List<Integer>> sortTaskMap(List<Integer> noIncomingNodes) throws Exception {
-        List<List<Integer>> sortedTasks = new LinkedList<>();
+    private List<TIntSet> sortTaskMap(TIntSet noIncomingNodes) throws Exception {
+        List<TIntSet> sortedTasks = new LinkedList<>();
         sortedTasks.add(noIncomingNodes);
 
-        Set<Integer> allValues = null;
-        List<Integer> allLinkedValues = new LinkedList<>();
+        TIntList currentLevelNoIncomingNodes = new TIntLinkedList();
 
         while (!taskMap.isEmpty()) {
             if (noIncomingNodes.isEmpty())
                 throw new Exception("Graph has cycle.");
 
-            for (Integer value : noIncomingNodes) {
-                Collection<Integer> linkedList = taskMap.remove(value);
-                if (linkedList == null || linkedList.isEmpty())
+            TIntIterator iterator = noIncomingNodes.iterator();
+            while (iterator.hasNext()) {
+                int removedNode = iterator.next();
+                TIntCollection linkedNodes = taskMap.remove(removedNode);
+                if (linkedNodes == null || linkedNodes.isEmpty())
                     continue;
 
-                allLinkedValues.addAll(linkedList);
+                currentLevelNoIncomingNodes.addAll(linkedNodes);
             }
 
-            List<Integer> newNoIncomingNodes = new LinkedList<>();
-            allValues = new LinkedHashSet<>(taskMap.values());
-            for (Integer linked : allLinkedValues){
-                if (allValues.add(linked))
-                    newNoIncomingNodes.add(linked);
+            TIntSet newNoIncomingNodes = new TIntHashSet(currentLevelNoIncomingNodes);
+            for (TIntList remainingLinkedNodes : taskMap.valueCollection()) {
+                newNoIncomingNodes.removeAll(remainingLinkedNodes);
             }
-            allValues.clear();
-            allLinkedValues.clear();
+            currentLevelNoIncomingNodes.clear();
 
             noIncomingNodes = newNoIncomingNodes;
-            if (!noIncomingNodes.isEmpty()) sortedTasks.add(noIncomingNodes);
+            if (!noIncomingNodes.isEmpty())
+                sortedTasks.add(noIncomingNodes);
         }
 
         return sortedTasks;
     }
 
-    private void readFileAndFillTaskMap(String filename) {
-        this.taskMap = new HashSetValuedHashMap<>(1000, 1);
+    private void readFileAndFillTaskMap(String filename) throws IOException {
+        try (FileInputStream stream = new FileInputStream(filename);
+             Scanner scanner = new Scanner(stream)) {
+            while (scanner.hasNext()) {
+                int value1 = scanner.nextInt();
+                int value2 = scanner.nextInt();
 
-        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                String[] numbers = line.split(" ");
-                int value1 = Integer.parseInt(numbers[0]);
-                int value2 = Integer.parseInt(numbers[1]);
-
-                taskMap.put(value1, value2);
+                if (!taskMap.containsKey(value1)) {
+                    TIntList linkedList = new TIntArrayList();
+                    linkedList.add(value2);
+                    taskMap.put(value1, linkedList);
+                } else {
+                    taskMap.get(value1).add(value2);
+                }
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 }
